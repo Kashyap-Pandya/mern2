@@ -1,35 +1,43 @@
 import multer from "multer";
-import path from "path";
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import fs from "fs";
+import { uploadOnCloudinary } from "../Utils/Cloudinary.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Multer storage configuration to keep files in memory
+const storage = multer.memoryStorage();
 
-// Define the upload directory path
-const uploadDir = path.join(__dirname, "../uploads");
+// Multer configuration
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    // Allow only image files (jpeg, jpg, png)
+    const filetypes = /jpeg|jpg|png/;
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(file.originalname.toLowerCase());
 
-// Check if the directory exists, and create it if it doesn't
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    // Ensure the directory exists before saving the file
-    fs.access(uploadDir, fs.constants.W_OK, (err) => {
-      if (err) {
-        console.error("Upload directory is not accessible:", err);
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-      cb(null, uploadDir);
-    });
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed!"));
+    }
   },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now();
-    cb(null, `${uniqueSuffix}-${file.originalname}`);
-  },
+  limits: { fileSize: 5 * 1024 * 1024 }, // Set file size limit to 5MB
 });
 
-export const upload = multer({ storage });
+// Middleware function to handle file upload and upload to Cloudinary
+export const handleFileUpload = async (req, res, next) => {
+  if (!req.file) return next();
+
+  try {
+    // Upload buffer to Cloudinary
+    const result = await uploadOnCloudinary(req.file.buffer);
+    req.file.cloudinaryUrl = result.secure_url; // Attach URL to request object for further use
+    next();
+  } catch (error) {
+    console.error("Error uploading to Cloudinary:", error);
+    res.status(500).json({
+      message: "Error uploading image to Cloudinary",
+      error: error.message,
+    });
+  }
+};
+
+export { upload };
