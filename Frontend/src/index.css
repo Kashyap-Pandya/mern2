@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .input {
+    @apply w-fit px-3 py-2 border-2 rounded-md my-1 outline-none;
+  }
+
+  .label {
+    @apply block mb-1 tracking-wider font-semibold my-1;
+  }
+}
